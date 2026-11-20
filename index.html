@@ -5,7 +5,8 @@
 <div id="home" class="page"><div class="stats"><section><small>Karten auf Lager</small><div id="count" class="value">0</div></section><section><small>Einkaufswert (zugeordnet)</small><div id="stockValue" class="value">0 €</div></section><section><small>Verkaufte Karten</small><div id="soldCount" class="value">0</div></section><section><small>Verkaufserlöse</small><div id="salesValue" class="value">0 €</div></section></div><section><h2>Schnellzugriff</h2><div class="actions"><button onclick="tab('new')">+ Karte / Sammlung erfassen</button><button class="secondary" onclick="tab('stock')">Bestand ansehen</button></div></section><section class="notice">Alle Daten werden lokal auf diesem Gerät gespeichert. Bitte nach jeder Erfassungssitzung ein JSON-Backup exportieren und in „Dateien“/iCloud Drive sichern. Browserdaten können gelöscht werden.</section></div>
 <div id="new" class="page hidden"><section><h2>Ankauf erfassen</h2><label>Art des Ankaufs</label><select id="kind" onchange="kindChanged()"><option value="single">Einzelkarte</option><option value="collection">Sammlung</option></select><div class="grid"><div><label>Einkaufsdatum</label><input type="date" id="purchaseDate"></div><div><label>Verkäuferart</label><select id="sellerType"><option value="privat">Privatperson</option><option value="unternehmen">Unternehmen</option><option value="einlage">Privateinlage</option></select></div><div class="full"><label id="nameLabel">Kartenname</label><input id="name" placeholder="z. B. Glurak 4/102"></div><div id="cardFields" class="full grid">
 <div class="full">
-<details id="cardLookup">
+<label for="cardLanguage">Kartensprache</label><select id="cardLanguage"><option value="de">Deutsch</option><option value="en">Englisch</option><option value="ja">Japanisch</option></select>
+<details style="margin-top:12px" id="cardLookup">
 <summary>Pokémon-Karte suchen und Ankauf berechnen</summary>
 <label for="cardQuery">Kartenname, optional mit Nummer</label>
 <input id="cardQuery" type="search" placeholder="z. B. Glurak 4/102" autocomplete="off">
@@ -13,6 +14,10 @@
 <div id="choicesBox" hidden><label for="choices">Passende Ausgaben</label><select id="choices"></select></div>
 <div id="quoteBox" hidden>
 <p id="cardCaption"></p>
+<div id="jpPrintBox" hidden><label for="jpPrint">Japanische Ausgabe</label><select id="jpPrint"></select></div>
+<p><a id="cmOfferLink" target="_blank" rel="noopener noreferrer" hidden></a></p>
+<p id="cmNotice" role="status"></p>
+<small id="jpCredit" hidden>Ausgabenzuordnung von <a href="https://github.com/cardcorpus/pokemon-card-dataset" target="_blank" rel="noopener">CardCorpus</a> (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>).</small>
 <label for="priceSeries">Cardmarket-Richtwert über TCGdex</label><select id="priceSeries"></select>
 <p>Die Richtwerte fassen mehrere Zustände zusammen. Den Preis für den Zustand deiner Karte kannst du hier eintragen.</p>
 <div class="grid"><div><label for="basis">Marktwert für den Ankauf (€)</label><input id="basis" inputmode="decimal"></div>
@@ -31,16 +36,17 @@ function persist(){try{localStorage.setItem(KEY,JSON.stringify(db));renderAll();
 function tab(id){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('hidden',p.id!==id));document.querySelectorAll('nav button').forEach((b,i)=>b.classList.toggle('secondary',['home','stock','new','calc','export','cloud'][i]!==id));renderAll()}
 function kindChanged(){const collection=$('kind').value==='collection';$('cardFields').classList.toggle('hidden',collection);$('nameLabel').textContent=collection?'Name der Sammlung':'Kartenname';$('priceLabel').textContent=collection?'Gesamter Einkaufspreis (€)':'Einkaufspreis (€)'}
 function uid(prefix){return prefix+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7)}
-function addPurchase(){const name=$('name').value.trim(),price=val($('purchasePrice').value);if(!name||!Number.isFinite(price)||price<0||!$('purchasePrice').value.trim()){alert('Bitte Namen und gültigen Einkaufspreis eintragen.');return}const base={id:uid('A'),name,purchaseDate:$('purchaseDate').value||today(),sellerType:$('sellerType').value,taxType:$('taxType').value,note:$('note').value,purchasePrice:price,createdAt:new Date().toISOString()};if($('kind').value==='collection'){db.collections.push({...base});$('purchaseMessage').textContent='Sammlung gespeichert. Öffne „Bestand“, um einzelne Karten hinzuzufügen.'}else{db.cards.push({...base,collectionId:null,allocatedCost:price,setName:$('setName').value,cardNumber:$('cardNumber').value,condition:$('condition').value,market:val($('market').value),status:'stock',sale:null});$('purchaseMessage').textContent='Karte gespeichert.'}if(persist()){$('name').value='';$('purchasePrice').value='';$('note').value='';$('setName').value='';$('cardNumber').value='';$('market').value=''}}
+const languages = {de:'Deutsch',en:'Englisch',ja:'Japanisch'};
+function addPurchase(){const name=$('name').value.trim(),price=val($('purchasePrice').value);if(!name||!Number.isFinite(price)||price<0||!$('purchasePrice').value.trim()){alert('Bitte Namen und gültigen Einkaufspreis eintragen.');return}const base={id:uid('A'),name,purchaseDate:$('purchaseDate').value||today(),sellerType:$('sellerType').value,taxType:$('taxType').value,note:$('note').value,purchasePrice:price,createdAt:new Date().toISOString()};if($('kind').value==='collection'){db.collections.push({...base});$('purchaseMessage').textContent='Sammlung gespeichert. Öffne „Bestand“, um einzelne Karten hinzuzufügen.'}else{db.cards.push({...base,collectionId:null,allocatedCost:price,setName:$('setName').value,cardNumber:$('cardNumber').value,language:$('cardLanguage').value,condition:$('condition').value,market:val($('market').value),status:'stock',sale:null});$('purchaseMessage').textContent='Karte gespeichert.'}if(persist()){$('name').value='';$('purchasePrice').value='';$('note').value='';$('setName').value='';$('cardNumber').value='';$('market').value=''}}
 function renderAll(){const unsold=db.cards.filter(c=>c.status!=='sold');$('count').textContent=unsold.length;$('stockValue').textContent=money(unsold.reduce((a,c)=>a+Number(c.allocatedCost||0),0));$('soldCount').textContent=db.cards.filter(c=>c.status==='sold').length;$('salesValue').textContent=money(db.cards.reduce((a,c)=>a+Number(c.sale?.price||0)+Number(c.sale?.buyerShipping||0),0));renderStock()}
 function renderStock(){const q=$('search').value.toLowerCase(),f=$('filter').value;let html='';for(const co of db.collections.filter(c=>(c.name+' '+c.id).toLowerCase().includes(q)||!q)){const linked=db.cards.filter(c=>c.collectionId===co.id),allocated=linked.reduce((a,c)=>a+Number(c.allocatedCost||0),0),remaining=co.purchasePrice-allocated;html+=`<div class="item"><div class="row"><strong>📦 ${esc(co.name)}</strong><span class="tag">Sammlung</span></div><small>${esc(co.id)} · ${esc(co.purchaseDate)}</small><p>Gesamteinkauf: ${money(co.purchasePrice)} · Zugeteilt: ${money(allocated)} · Offen: ${money(remaining)} · ${linked.length} Karten</p><div class="actions"><button onclick="addToCollection('${co.id}')">+ Karte hinzufügen</button></div></div>`}
-for(const c of db.cards.filter(c=>(c.name+' '+c.setName+' '+c.cardNumber+' '+c.id).toLowerCase().includes(q)&&(f==='all'||c.status===f))){html+=`<div class="item"><div class="row"><strong>${esc(c.name)}</strong><span class="tag">${({stock:'Auf Lager',listed:'Eingestellt',sold:'Verkauft'})[c.status]||esc(c.status)}</span></div><small>${esc(c.setName||'')} ${esc(c.cardNumber||'')} · ${esc(c.id)}</small><p>Einkauf: ${money(c.allocatedCost)}${c.sale?' · Verkauf: '+money(c.sale.price):''}</p><div class="actions"><button class="secondary" onclick="editCard('${c.id}')">Bearbeiten</button>${c.status!=='sold'?`<button onclick="sellCard('${c.id}')">Verkauf erfassen</button>`:''}</div></div>`} $('items').innerHTML=html||'<p>Noch keine Einträge.</p>'}
-function addToCollection(id){const co=db.collections.find(x=>x.id===id);if(!co)return;const name=prompt('Kartenname?');if(!name?.trim())return;const costStr=prompt('Zugeordneter Einkaufspreis in € (Summe darf den Sammlungsankauf nicht übersteigen):','0');if(costStr===null)return;const cost=val(costStr),used=db.cards.filter(c=>c.collectionId===id).reduce((a,c)=>a+Number(c.allocatedCost||0),0);if(!Number.isFinite(cost)||cost<0||used+cost>co.purchasePrice+.00001){alert('Ungültiger Betrag oder Einkaufspreis der Sammlung überschritten.');return}db.cards.push({id:uid('K'),name:name.trim(),purchaseDate:co.purchaseDate,sellerType:co.sellerType,taxType:co.taxType,note:'Aus Sammlung '+co.id,collectionId:id,allocatedCost:cost,purchasePrice:cost,setName:'',cardNumber:'',condition:'NM',market:0,status:'stock',sale:null,createdAt:new Date().toISOString()});persist()}
-function editCard(id){const c=db.cards.find(x=>x.id===id);if(!c)return;editId=id;$('dialogTitle').textContent='Karte bearbeiten';$('dialogBody').innerHTML=`<label>Name</label><input id="eName" value="${esc(c.name)}"><label>Set</label><input id="eSet" value="${esc(c.setName)}"><label>Kartennummer</label><input id="eNumber" value="${esc(c.cardNumber)}"><label>Zustand</label><input id="eCondition" value="${esc(c.condition)}"><label>Marktwert (€)</label><input id="eMarket" inputmode="decimal" value="${c.market||0}"><label>Status</label><select id="eStatus"><option value="stock">Auf Lager</option><option value="listed">Eingestellt</option>${c.status==='sold'?'<option value="sold">Verkauft</option>':''}</select><label>Notiz</label><textarea id="eNote">${esc(c.note)}</textarea>`;$('eStatus').value=c.status;$('editDialog').showModal()}
-function saveEdit(){const c=db.cards.find(x=>x.id===editId);if(!c)return;c.name=$('eName').value.trim()||c.name;c.setName=$('eSet').value;c.cardNumber=$('eNumber').value;c.condition=$('eCondition').value;c.market=val($('eMarket').value)||0;c.status=$('eStatus').value;c.note=$('eNote').value;$('editDialog').close();persist()}
+for(const c of db.cards.filter(c=>(c.name+' '+c.setName+' '+c.cardNumber+' '+(languages[c.language]||'')+' '+c.id).toLowerCase().includes(q)&&(f==='all'||c.status===f))){html+=`<div class="item"><div class="row"><strong>${esc(c.name)}</strong><span class="tag">${({stock:'Auf Lager',listed:'Eingestellt',sold:'Verkauft'})[c.status]||esc(c.status)}</span></div><small>${esc(c.setName||'')} ${esc(c.cardNumber||'')} · ${languages[c.language]||'Sprache offen'} · ${esc(c.id)}</small><p>Einkauf: ${money(c.allocatedCost)}${c.sale?' · Verkauf: '+money(c.sale.price):''}</p><div class="actions"><button class="secondary" onclick="editCard('${c.id}')">Bearbeiten</button>${c.status!=='sold'?`<button onclick="sellCard('${c.id}')">Verkauf erfassen</button>`:''}</div></div>`} $('items').innerHTML=html||'<p>Noch keine Einträge.</p>'}
+function addToCollection(id){const co=db.collections.find(x=>x.id===id);if(!co)return;const name=prompt('Kartenname?');if(!name?.trim())return;const costStr=prompt('Zugeordneter Einkaufspreis in € (Summe darf den Sammlungsankauf nicht übersteigen):','0');if(costStr===null)return;const cost=val(costStr),used=db.cards.filter(c=>c.collectionId===id).reduce((a,c)=>a+Number(c.allocatedCost||0),0);if(!Number.isFinite(cost)||cost<0||used+cost>co.purchasePrice+.00001){alert('Ungültiger Betrag oder Einkaufspreis der Sammlung überschritten.');return}const inputLanguage=prompt('Kartensprache (Deutsch, Englisch oder Japanisch):','Deutsch');if(inputLanguage===null)return;const entry=inputLanguage.trim().toLowerCase();const language=Object.keys(languages).find(code=>code===entry||languages[code].toLowerCase()===entry);if(!language){alert('Bitte Deutsch, Englisch oder Japanisch eingeben.');return}db.cards.push({language,id:uid('K'),name:name.trim(),purchaseDate:co.purchaseDate,sellerType:co.sellerType,taxType:co.taxType,note:'Aus Sammlung '+co.id,collectionId:id,allocatedCost:cost,purchasePrice:cost,setName:'',cardNumber:'',condition:'NM',market:0,status:'stock',sale:null,createdAt:new Date().toISOString()});persist()}
+function editCard(id){const c=db.cards.find(x=>x.id===id);if(!c)return;editId=id;$('dialogTitle').textContent='Karte bearbeiten';$('dialogBody').innerHTML=`<label>Name</label><input id="eName" value="${esc(c.name)}"><label>Set</label><input id="eSet" value="${esc(c.setName)}"><label>Kartennummer</label><input id="eNumber" value="${esc(c.cardNumber)}"><label for="eLanguage">Kartensprache</label><select id="eLanguage"><option value="">Nicht erfasst</option><option value="de">Deutsch</option><option value="en">Englisch</option><option value="ja">Japanisch</option></select><label>Zustand</label><input id="eCondition" value="${esc(c.condition)}"><label>Marktwert (€)</label><input id="eMarket" inputmode="decimal" value="${c.market||0}"><label>Status</label><select id="eStatus"><option value="stock">Auf Lager</option><option value="listed">Eingestellt</option>${c.status==='sold'?'<option value="sold">Verkauft</option>':''}</select><label>Notiz</label><textarea id="eNote">${esc(c.note)}</textarea>`;$('eLanguage').value=c.language||'';$('eStatus').value=c.status;$('editDialog').showModal()}
+function saveEdit(){const c=db.cards.find(x=>x.id===editId);if(!c)return;c.name=$('eName').value.trim()||c.name;c.setName=$('eSet').value;c.cardNumber=$('eNumber').value;c.language=$('eLanguage').value;c.condition=$('eCondition').value;c.market=val($('eMarket').value)||0;c.status=$('eStatus').value;c.note=$('eNote').value;$('editDialog').close();persist()}
 function sellCard(id){const c=db.cards.find(x=>x.id===id);if(!c)return;const priceStr=prompt('Tatsächlicher Artikelverkaufspreis (€):',String(c.market||''));if(priceStr===null)return;const price=val(priceStr);if(!priceStr.trim()||!Number.isFinite(price)||price<0){alert('Ungültiger Preis');return}const platform=prompt('Plattform (eBay / Cardmarket / Sonstige):','eBay');if(platform===null)return;const feeStr=prompt('Tatsächliche Plattformgebühren (€), wie abgerechnet (brutto):','0');if(feeStr===null)return;const fee=val(feeStr);const shipStr=prompt('Eigene Versandkosten (€), brutto:','0');if(shipStr===null)return;const shipping=val(shipStr);const buyerStr=prompt('Versandzahlung des Käufers (€):','0');if(buyerStr===null)return;const buyerShipping=val(buyerStr);if([fee,shipping,buyerShipping].some(v=>!Number.isFinite(v)||v<0)){alert('Ungültige Beträge');return}c.status='sold';c.sale={date:today(),platform:platform.trim(),price,fee,shipping,buyerShipping};persist()}
 function download(name,content,type){const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000)}
-function csvCell(v){let s=String(v??'');return '"'+s.replace(/"/g,'""')+'"'}function csvExport(which){let rows;if(which==='cards'){rows=[['ID','Sammlung-ID','Name','Set','Kartennummer','Zustand','Einkaufsdatum','Verkäuferart','Steuerstatus','Zugeordneter Einkaufspreis','Marktwert','Status','Notiz'],...db.cards.map(c=>[c.id,c.collectionId,c.name,c.setName,c.cardNumber,c.condition,c.purchaseDate,c.sellerType,c.taxType,c.allocatedCost,c.market,c.status,c.note])]}else{rows=[['Karten-ID','Name','Verkaufsdatum','Plattform','Artikelpreis','Käuferversand','Gebühren brutto','Versandkosten brutto','Zugeordneter Einkaufspreis','Steuerstatus'],...db.cards.filter(c=>c.sale).map(c=>[c.id,c.name,c.sale.date,c.sale.platform,c.sale.price,c.sale.buyerShipping,c.sale.fee,c.sale.shipping,c.allocatedCost,c.taxType])]}download('psychedelicards_'+which+'_'+today()+'.csv','\ufeff'+rows.map(r=>r.map(csvCell).join(';')).join('\r\n'),'text/csv;charset=utf-8')}
+function csvCell(v){let s=String(v??'');return '"'+s.replace(/"/g,'""')+'"'}function csvExport(which){let rows;if(which==='cards'){rows=[['ID','Sammlung-ID','Name','Set','Kartennummer','Zustand','Einkaufsdatum','Verkäuferart','Steuerstatus','Zugeordneter Einkaufspreis','Marktwert','Status','Notiz','Sprache'],...db.cards.map(c=>[c.id,c.collectionId,c.name,c.setName,c.cardNumber,c.condition,c.purchaseDate,c.sellerType,c.taxType,c.allocatedCost,c.market,c.status,c.note,languages[c.language]||''])]}else{rows=[['Karten-ID','Name','Verkaufsdatum','Plattform','Artikelpreis','Käuferversand','Gebühren brutto','Versandkosten brutto','Zugeordneter Einkaufspreis','Steuerstatus','Sprache'],...db.cards.filter(c=>c.sale).map(c=>[c.id,c.name,c.sale.date,c.sale.platform,c.sale.price,c.sale.buyerShipping,c.sale.fee,c.sale.shipping,c.allocatedCost,c.taxType,languages[c.language]||''])]}download('psychedelicards_'+which+'_'+today()+'.csv','\ufeff'+rows.map(r=>r.map(csvCell).join(';')).join('\r\n'),'text/csv;charset=utf-8')}
 function backup(){download('psychedelicards_backup_'+today()+'.json',JSON.stringify({version:1,exportedAt:new Date().toISOString(),data:db},null,2),'application/json')}
 async function restore(){const file=$('restoreFile').files[0];if(!file){alert('Bitte eine JSON-Datei auswählen.');return}try{const obj=JSON.parse(await file.text());if(obj.version!==1||!Array.isArray(obj.data?.cards)||!Array.isArray(obj.data?.collections))throw Error('Ungültiges Backup');if(!confirm('Alle vorhandenen lokalen Daten durch dieses Backup ersetzen?'))return;db=obj.data;persist();alert('Backup wiederhergestellt.')}catch(e){alert('Import fehlgeschlagen: '+e.message)}}
 $('purchaseDate').value=today();kindChanged();renderAll();if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).catch(console.warn));
@@ -147,7 +153,7 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
   };
   function preview() {
     const price = amount();
-    $('takeQuote').disabled = !selected || !Number.isFinite(price);
+    $('takeQuote').disabled = !selected || !Number.isFinite(price) || ($('cardLanguage').value === 'ja' && !japanesePrint());
     $('quotePreview').textContent = Number.isFinite(price) ? 'Einkaufspreis: ' + money(price) : 'Marktwert und Quote (0–100 %) mit maximal zwei Nachkommastellen eingeben.';
   }
   try {
@@ -196,8 +202,15 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
         $('lookupStatus').textContent = 'Ausgaben werden gesucht …';
         const parts = query.match(/^(.*?)\s+([A-Z]*\d+[a-z]?)(?:\/(\d+))?$/i);
         const params = new URLSearchParams({ name: parts ? parts[1] : query });
-        const [rows, index] = await Promise.all([get(apiRoot + '?' + params, signal), setIndex()]);
+        let [rows, index] = await Promise.all([get(apiRoot + '?' + params, signal), setIndex()]);
         if (signal.aborted) return;
+        if (!rows.length && /[ -]/.test(params.get('name'))) {
+          const normalized = params.get('name').toLowerCase().replace(/[ -]+/g,'');
+          const word = params.get('name').split(/[ -]+/).sort((a,b)=>b.length-a.length)[0];
+          const candidates = await get(apiRoot + '?' + new URLSearchParams({name:word}), signal);
+          if (signal.aborted) return;
+          rows = candidates.filter(row=>row.name.toLowerCase().replace(/[ -]+/g,'').includes(normalized));
+        }
         const clean = n => String(n).replace(/^0+(?=\d)/,'').toLowerCase();
         const matches = rows.filter(row => {
           const total = index.get(setId(row))?.cardCount?.official;
@@ -227,7 +240,52 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
       if (signal.aborted) return;
       if (card.id !== id || !card.name || !card.localId) throw Error();
       selected = card;
-      const market = card.pricing?.cardmarket;
+      await renderLanguage();
+    } catch {
+      if (!signal.aborted) $('lookupStatus').textContent = 'Kartendaten nicht erreichbar. Ausgabe erneut auswählen oder manuell erfassen.';
+    }
+  });
+  let jpCatalog, jpOptions = [], version = 0;
+  function showOffer(id) {
+    const lang = $('cardLanguage').value;
+    const link = $('cmOfferLink');
+    link.hidden = !id;
+    if (!id) { link.removeAttribute('href'); return; }
+    const paths = {
+      869882:'Ascended-Heroes/Mega-Dragonite-ex-V2-ASC271',
+      861475:'MEGA-Dream-ex/Mega-Dragonite-ex-V2-m2a232',
+      273699:'Base-Set/Charizard'
+    };
+    const url = new URL('https://www.cardmarket.com/de/Pokemon/Products' + (paths[id] ? '/Singles/' + paths[id] : ''));
+    if (!paths[id]) url.searchParams.set('idProduct', id);
+    url.searchParams.set('language', {de:3,en:1,ja:7}[lang]);
+    url.searchParams.set('sellerCountry','7');
+    link.href = url.href;
+    link.textContent = 'Cardmarket öffnen · ' + languages[lang] + ' · Verkäufer aus Deutschland ↗';
+  }
+  function japanesePrint() {
+    return jpOptions.find(print => String(print.id) === $('jpPrint').value);
+  }
+  function applyJapanesePrint() {
+    const print = japanesePrint();
+    showOffer(print?.id);
+    $('basis').value = '';
+    $('cmNotice').textContent = print ? print.set + ' · ' + print.number : 'Bitte die japanische Ausgabe auswählen.';
+    preview();
+  }
+  $('jpPrint').addEventListener('change', applyJapanesePrint);
+  $('cardLanguage').addEventListener('change', renderLanguage);
+  async function renderLanguage() {
+    const card = selected, current = ++version;
+    if (!card) return;
+    const japanese = $('cardLanguage').value === 'ja';
+    const product = card.pricing?.cardmarket?.idProduct;
+    jpOptions = [];
+    $('jpPrintBox').hidden = true;
+    $('jpCredit').hidden = !japanese;
+    showOffer(japanese ? null : product);
+    $('cmNotice').textContent = japanese ? 'Japanische Ausgabe wird gesucht …' : (product ? '' : 'Für diese Ausgabe fehlt ein Cardmarket-Link.');
+      const market = japanese ? null : card.pricing?.cardmarket;
       const series = $('priceSeries');
       series.replaceChildren();
       for (const [suffix, variant] of [['','Standard'],['-holo','Holo-Reihe']]) {
@@ -236,17 +294,33 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
           if (market?.unit === 'EUR' && Number.isFinite(value) && value > 0) series.add(new Option(variant + ' · ' + label + ' · ' + money(value), value.toFixed(2)));
         }
       }
-      if (!series.length) series.add(new Option('Kein öffentlicher Richtwert vorhanden',''));
+      if (!series.length) series.add(new Option(japanese ? 'Japanischen Angebotspreis unten eintragen' : 'Kein öffentlicher Richtwert vorhanden',''));
       const updated = new Date(market?.updated);
       $('lookupStatus').textContent = market?.updated && Number.isFinite(updated.getTime()) ? 'Preisstand: ' + updated.toLocaleDateString('de-DE') : '';
       $('cardCaption').textContent = [card.name, card.set?.name, numberOf(card)].filter(Boolean).join(' · ');
       $('basis').value = series.value;
       $('quoteBox').hidden = false;
       preview();
+    if (!japanese) return;
+    try {
+      jpCatalog ||= get('./cardmarket-jp.json').catch(error => { jpCatalog = null; throw error; });
+      const data = await jpCatalog;
+      if (selected !== card || version !== current) return;
+      jpOptions = (data.products[product] || []).map(([id,set,number]) => ({id,set:data.sets[set],number}));
+      if (jpOptions.length) {
+        const select = $('jpPrint');
+        select.replaceChildren();
+        if (jpOptions.length > 1) select.add(new Option('Ausgabe auswählen …',''));
+        for (const print of jpOptions) select.add(new Option(print.set + ' · ' + print.number, String(print.id)));
+        $('jpPrintBox').hidden = jpOptions.length < 2;
+        applyJapanesePrint();
+      } else {
+        $('cmNotice').textContent = 'Keine japanische Ausgabe zugeordnet. Set und Nummer bitte manuell erfassen.';
+      }
     } catch {
-      if (!signal.aborted) $('lookupStatus').textContent = 'Kartendaten nicht erreichbar. Ausgabe erneut auswählen oder manuell erfassen.';
+      if (selected === card && version === current) $('cmNotice').textContent = 'Japanische Zuordnung nicht verfügbar. Set und Nummer bitte manuell erfassen.';
     }
-  });
+  }
   function numberOf(card) {
     return card.set?.cardCount?.official ? card.localId + '/' + card.set.cardCount.official : card.localId;
   }
@@ -261,8 +335,10 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     const price = amount();
     if (!selected || !Number.isFinite(price) || $('kind').value !== 'single') return;
     $('name').value = selected.name;
-    $('setName').value = selected.set?.name || '';
-    $('cardNumber').value = numberOf(selected);
+    const print = $('cardLanguage').value === 'ja' ? japanesePrint() : null;
+    if ($('cardLanguage').value === 'ja' && !print) return;
+    $('setName').value = print?.set || selected.set?.name || '';
+    $('cardNumber').value = print?.number || numberOf(selected);
     $('market').value = decimal($('basis').value).toFixed(2);
     $('purchasePrice').value = price.toFixed(2);
     closeLookup();
