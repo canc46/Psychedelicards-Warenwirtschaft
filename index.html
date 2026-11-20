@@ -8,8 +8,8 @@
 <label for="cardLanguage">Kartensprache</label><select id="cardLanguage"><option value="de">Deutsch</option><option value="en">Englisch</option><option value="ja">Japanisch</option></select>
 <details style="margin-top:12px" id="cardLookup">
 <summary>Pokémon-Karte suchen und Ankauf berechnen</summary>
-<label for="cardQuery">Kartenname, optional mit Nummer</label>
-<input id="cardQuery" type="search" placeholder="z. B. Glurak 4/102" autocomplete="off">
+<label for="cardQuery">Kartenname, Setname oder Setkürzel</label>
+<input id="cardQuery" type="search" placeholder="z. B. ASC271 oder Glurak 4/102" autocomplete="off">
 <p id="lookupStatus" role="status"></p>
 <div id="choicesBox" hidden><label for="choices">Passende Ausgaben</label><select id="choices"></select></div>
 <div id="quoteBox" hidden>
@@ -175,6 +175,52 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     });
     return sets;
   }
+  const setRoot = 'https://api.tcgdex.net/v2/de/sets';
+  const normalize = value => value.normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const cardNumberKey = value => String(value).toLowerCase().replace(/(\D|^)0+(?=\d)/g,'$1');
+  let englishSets;
+  async function findSetCards(query, index, signal) {
+    if (!index.size) return null;
+    if (!englishSets) englishSets = get('https://api.tcgdex.net/v2/en/sets').catch(() => { englishSets = null; return []; });
+    const aliases = new Map();
+    function addAlias(name, id) {
+      if (!index.has(id) || !name) return;
+      const key = normalize(name);
+      if (!aliases.has(key)) aliases.set(key,new Set());
+      aliases.get(key).add(id);
+    }
+    for (const set of index.values()) { addAlias(set.name,set.id); addAlias(set.id,set.id); }
+    for (const set of await englishSets) addAlias(set.name,set.id);
+    if (signal.aborted) return null;
+    const [text,total] = query.split('/').map(part => part.trim());
+    if (total !== undefined && !/^\d+$/.test(total)) return null;
+    const key = normalize(text);
+    let ids = aliases.get(key), number = '';
+    if (!ids) {
+      // Prefer the longest known set name or ID, including IDs that end in a digit.
+      for (const alias of [...aliases.keys()].sort((a,b)=>b.length-a.length)) {
+        if (!key.startsWith(alias)) continue;
+        const suffix = key.slice(alias.length);
+        if (/^(?:[a-z]{1,4})?\d+[a-z]?$/.test(suffix)) {
+          ids = aliases.get(alias); number = suffix; break;
+        }
+      }
+    }
+    if (!ids) {
+      const parts = text.match(/^([a-z]{2,5})[\s#-]*(\d+[a-z]?)?$/i);
+      if (!parts) return null;
+      const filter = new URLSearchParams({'abbreviation.official':'eq:' + parts[1].toUpperCase()});
+      const matches = await get(setRoot + '?' + filter, signal);
+      ids = matches.filter(set=>index.has(set.id)).map(set=>set.id);
+      if (!ids.length) return null;
+      number = parts[2] || '';
+    }
+    const sets = await Promise.all([...ids].map(id=>get(setRoot + '/' + encodeURIComponent(id),signal)));
+    return sets.flatMap(set => {
+      if (total && Number(total) !== set.cardCount?.official) return [];
+      return (set.cards || []).filter(card=>!number || cardNumberKey(card.localId) === cardNumberKey(number));
+    });
+  }
   const setId = card => card.id.slice(0, -(String(card.localId).length + 1));
   function clearDetail() {
     selected = null;
@@ -200,23 +246,30 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     timer = setTimeout(async () => {
       try {
         $('lookupStatus').textContent = 'Ausgaben werden gesucht …';
-        const parts = query.match(/^(.*?)\s+([A-Z]*\d+[a-z]?)(?:\/(\d+))?$/i);
-        const params = new URLSearchParams({ name: parts ? parts[1] : query });
-        let [rows, index] = await Promise.all([get(apiRoot + '?' + params, signal), setIndex()]);
+        const index = await setIndex();
         if (signal.aborted) return;
-        if (!rows.length && /[ -]/.test(params.get('name'))) {
-          const normalized = params.get('name').toLowerCase().replace(/[ -]+/g,'');
-          const word = params.get('name').split(/[ -]+/).sort((a,b)=>b.length-a.length)[0];
-          const candidates = await get(apiRoot + '?' + new URLSearchParams({name:word}), signal);
+        let matches = await findSetCards(query, index, signal).catch(() => null);
+        if (signal.aborted) return;
+        if (matches === null) {
+          const parts = query.match(/^(.*?)\s+([A-Z]*\d+[a-z]?)(?:\/(\d+))?$/i);
+          const params = new URLSearchParams({ name: parts ? parts[1] : query });
+          let rows = await get(apiRoot + '?' + params, signal);
           if (signal.aborted) return;
-          rows = candidates.filter(row=>row.name.toLowerCase().replace(/[ -]+/g,'').includes(normalized));
+          if (!rows.length && /[ -]/.test(params.get('name'))) {
+            const normalized = params.get('name').toLowerCase().replace(/[ -]+/g,'');
+            const word = params.get('name').split(/[ -]+/).sort((a,b)=>b.length-a.length)[0];
+            const candidates = await get(apiRoot + '?' + new URLSearchParams({name:word}), signal);
+            if (signal.aborted) return;
+            rows = candidates.filter(row=>row.name.toLowerCase().replace(/[ -]+/g,'').includes(normalized));
+          }
+          const clean = n => String(n).replace(/^0+(?=\d)/,'').toLowerCase();
+          matches = rows.filter(row => {
+            const total = index.get(setId(row))?.cardCount?.official;
+            return !/^tcgp/i.test(row.id) && (!parts || clean(row.localId) === clean(parts[2])) &&
+              (!parts?.[3] || !total || Number(parts[3]) === Number(total));
+          });
         }
-        const clean = n => String(n).replace(/^0+(?=\d)/,'').toLowerCase();
-        const matches = rows.filter(row => {
-          const total = index.get(setId(row))?.cardCount?.official;
-          return !/^tcgp/i.test(row.id) && (!parts || clean(row.localId) === clean(parts[2])) &&
-            (!parts?.[3] || !total || Number(parts[3]) === Number(total));
-        });
+        if (signal.aborted) return;
         $('choices').replaceChildren(new Option('Ausgabe auswählen …',''));
         for (const row of matches) {
           $('choices').add(new Option(row.name + ' · ' + (index.get(setId(row))?.name || setId(row)) + ' · Nr. ' + row.localId, row.id));
