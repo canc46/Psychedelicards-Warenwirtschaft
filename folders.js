@@ -45,11 +45,18 @@ function gradingValue(prefix) {
 }
 function purchaseGrading() {return $('condition').value==='Graded'?gradingValue('g'):null;}
 function gradingLinks(g) {
+  if (g?.provider==='PSA') {
+    const cert=String(g.cert || '').trim();
+    const valid=/^\d+$/.test(cert);
+    const url='https://www.psacard.com/cert'+(valid?'/'+cert+'/psa#:~:text=PSA%20Population':'');
+    const label=valid?'PSA Population für Zertifikat '+cert:'PSA-Zertifikat nachschlagen';
+    return '<a href="'+url+'" target="_blank" rel="noopener">'+label+' ↗</a>';
+  }
   if (!g?.cert) return '';
   const cert=encodeURIComponent(g.cert);
-  const url={PSA:'https://www.psacard.com/cert/'+cert,CGC:'https://www.cgccards.com/certlookup/'+cert+'/',Beckett:'https://www.beckett.com/grading/card-lookup?flag=1&item_type=BGS&item_id='+cert}[g.provider];
+  const url={CGC:'https://www.cgccards.com/certlookup/'+cert+'/',Beckett:'https://www.beckett.com/grading/card-lookup?flag=1&item_type=BGS&item_id='+cert}[g.provider];
   if (!url) return '';
-  return '<a href="'+esc(url)+'" target="_blank" rel="noopener">Zertifikat '+esc(g.cert)+' ↗</a>'+(g.provider==='PSA'?' · <a href="https://www.psacard.com/pop/search" target="_blank" rel="noopener">PSA Population Report ↗</a>':'');
+  return '<a href="'+esc(url)+'" target="_blank" rel="noopener">Zertifikat '+esc(g.cert)+' ↗</a>';
 }
 function bindGrading(box,prefix,condition,data) {
   box.innerHTML=gradingFields(prefix,data);
