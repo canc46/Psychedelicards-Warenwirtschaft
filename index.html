@@ -255,15 +255,27 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
         if (matches === null) {
           const parts = query.match(/^(.*?)\s+([A-Z]*\d+[a-z]?)(?:\/(\d+))?$/i);
           const params = new URLSearchParams({ name: parts ? parts[1] : query });
-          let rows = await get(apiRoot + '?' + params, signal);
-          if (signal.aborted) return;
-          if (!rows.length && /[ -]/.test(params.get('name'))) {
-            const normalized = params.get('name').toLowerCase().replace(/[ -]+/g,'');
-            const word = params.get('name').split(/[ -]+/).sort((a,b)=>b.length-a.length)[0];
-            const candidates = await get(apiRoot + '?' + new URLSearchParams({name:word}), signal);
-            if (signal.aborted) return;
-            rows = candidates.filter(row=>row.name.toLowerCase().replace(/[ -]+/g,'').includes(normalized));
+          async function byName(language) {
+            const root = 'https://api.tcgdex.net/v2/' + language + '/cards';
+            const name = params.get('name');
+            let rows = await get(root + '?' + params, signal);
+            if (!rows.length && /[ -]/.test(name)) {
+              const word = name.split(/[ -]+/).sort((a,b)=>b.length-a.length)[0];
+              const candidates = await get(root + '?' + new URLSearchParams({name:word}), signal);
+              rows = candidates.filter(row=>normalize(row.name).includes(normalize(name)));
+            }
+            return rows.map(row=>({...row, language}));
           }
+          const order = $('cardLanguage').value === 'en' ? ['en','de'] : ['de','en'];
+          const results = await Promise.allSettled(order.map(byName));
+          if (signal.aborted) return;
+          const unique = new Map();
+          for (const result of results) {
+            if (result.status !== 'fulfilled') continue;
+            for (const row of result.value) if (!unique.has(row.id)) unique.set(row.id,row);
+          }
+          if (!unique.size && results.some(result=>result.status === 'rejected')) throw Error('Kartensuche unvollständig');
+          const rows = [...unique.values()];
           const clean = n => String(n).replace(/^0+(?=\d)/,'').toLowerCase();
           matches = rows.filter(row => {
             const total = index.get(setId(row))?.cardCount?.official;
@@ -274,7 +286,9 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
         if (signal.aborted) return;
         $('choices').replaceChildren(new Option('Ausgabe auswählen …',''));
         for (const row of matches) {
-          $('choices').add(new Option(row.name + ' · ' + (index.get(setId(row))?.name || setId(row)) + ' · Nr. ' + row.localId, row.id));
+          const option = new Option(row.name + ' · ' + (index.get(setId(row))?.name || setId(row)) + ' · Nr. ' + row.localId, row.id);
+          option.dataset.language = row.language || 'de';
+          $('choices').add(option);
         }
         $('choicesBox').hidden = !matches.length;
         $('lookupStatus').textContent = matches.length ? matches.length + ' passende Ausgaben' : 'Keine passende Ausgabe gefunden.';
@@ -291,7 +305,8 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     const signal = (request = new AbortController()).signal;
     try {
       $('lookupStatus').textContent = 'Kartendaten werden geladen …';
-      const card = await get(apiRoot + '/' + encodeURIComponent(id), signal);
+      const language = $('choices').selectedOptions[0].dataset.language;
+      const card = await get('https://api.tcgdex.net/v2/' + language + '/cards/' + encodeURIComponent(id), signal);
       if (signal.aborted) return;
       if (card.id !== id || !card.name || !card.localId) throw Error();
       selected = card;
