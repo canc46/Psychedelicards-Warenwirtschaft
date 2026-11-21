@@ -240,10 +240,32 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     if (!response.ok) throw Error('API ' + response.status);
     return response.json();
   }
+  const svgCharmander = {
+    id: 'jp-svg-051', name: 'Glumanda', localId: '051',
+    set: {name: 'Bisaflor & Glurak & Turtok Special Deck Set ex', cardCount: {official: '049'}},
+    print: {id: 745014, number: '051/049', set: 'Bisaflor & Glurak & Turtok Special Deck Set ex'}
+  };
+  function matchesSvgCharmander(query) {
+    const key = query.toLowerCase().replace(/[\s#-]/g,'');
+    if (/^(?:svg0?51(?:\/0?49)?|0?51\/0?49)$/.test(key)) return true;
+    const name = key.replace(/(?:svg)?0?51(?:\/0?49)?$/,'');
+    return name.length >= 2 && ['glumanda','charmander','ヒトカゲ','hitokage'].some(alias=>alias.startsWith(name));
+  }
+  function addJapaneseResult() {
+    $('choices').add(new Option('Glumanda · Japanisch · svG 051/049', svgCharmander.id));
+    $('choicesBox').hidden = false;
+  }
   $('cardQuery').addEventListener('input', () => {
     reset();
     const query = $('cardQuery').value.trim();
     if (query.length < 2) return;
+    const direct = matchesSvgCharmander(query);
+    if (direct) {
+      $('choices').replaceChildren(new Option('Ausgabe auswählen …',''));
+      addJapaneseResult();
+      $('lookupStatus').textContent = '1 passende Ausgabe';
+      if (/^(?:svg|0?51\/)/i.test(query.trim()) || /[ァ-ヶ]/.test(query)) return;
+    }
     const signal = (request = new AbortController()).signal;
     timer = setTimeout(async () => {
       try {
@@ -285,13 +307,15 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
         }
         if (signal.aborted) return;
         $('choices').replaceChildren(new Option('Ausgabe auswählen …',''));
+        if (direct) addJapaneseResult();
         for (const row of matches) {
           const option = new Option(row.name + ' · ' + (index.get(setId(row))?.name || setId(row)) + ' · Nr. ' + row.localId, row.id);
           option.dataset.language = row.language || 'de';
           $('choices').add(option);
         }
-        $('choicesBox').hidden = !matches.length;
-        $('lookupStatus').textContent = matches.length ? matches.length + ' passende Ausgaben' : 'Keine passende Ausgabe gefunden.';
+        const count = matches.length + Number(direct);
+        $('choicesBox').hidden = !count;
+        $('lookupStatus').textContent = count ? count + ' passende Ausgaben' : 'Keine passende Ausgabe gefunden.';
       } catch {
         if (!signal.aborted) $('lookupStatus').textContent = 'Suche nicht erreichbar. Erneut suchen oder Karte manuell erfassen.';
       }
@@ -306,7 +330,8 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     try {
       $('lookupStatus').textContent = 'Kartendaten werden geladen …';
       const language = $('choices').selectedOptions[0].dataset.language;
-      const card = await get('https://api.tcgdex.net/v2/' + language + '/cards/' + encodeURIComponent(id), signal);
+      const card = id === svgCharmander.id ? svgCharmander : await get('https://api.tcgdex.net/v2/' + language + '/cards/' + encodeURIComponent(id), signal);
+      if (card.print) $('cardLanguage').value = 'ja';
       if (signal.aborted) return;
       if (card.id !== id || !card.name || !card.localId) throw Error();
       selected = card;
@@ -324,6 +349,7 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     link.hidden = !id;
     if (!id) { link.removeAttribute('href'); return; }
     const paths = {
+      745014:'Venusaur-Charizard-Blastoise-Special-Deck-Set-ex/Charmander-V2-svG051',
       869882:'Ascended-Heroes/Mega-Dragonite-ex-V2-ASC271',
       861475:'MEGA-Dream-ex/Mega-Dragonite-ex-V2-m2a232',
       273699:'Base-Set/Charizard'
@@ -336,6 +362,7 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     link.textContent = 'Cardmarket öffnen · ' + languages[lang] + ' · Verkäufer aus Deutschland ↗';
   }
   function japanesePrint() {
+    if (selected?.print) return selected.print;
     return jpOptions.find(print => String(print.id) === $('jpPrint').value);
   }
   function fillEdition(set, number) {
@@ -356,6 +383,13 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     const card = selected, current = ++version;
     if (!card) return;
     const japanese = $('cardLanguage').value === 'ja';
+    if (card.print && !japanese) {
+      $('name').value = '';
+      delete $('name').dataset.lookupCode;
+      fillEdition('', '');
+      $('cardQuery').dispatchEvent(new Event('input'));
+      return;
+    }
     fillEdition(japanese ? '' : card.set?.name, japanese ? '' : numberOf(card));
     const product = card.pricing?.cardmarket?.idProduct;
     jpOptions = [];
@@ -380,6 +414,7 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
       $('quoteBox').hidden = false;
       preview();
     if (!japanese) return;
+    if (card.print) { applyJapanesePrint(); return; }
     try {
       jpCatalog ||= get('./cardmarket-jp.json').catch(error => { jpCatalog = null; throw error; });
       const data = await jpCatalog;
