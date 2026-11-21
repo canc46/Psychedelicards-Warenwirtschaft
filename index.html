@@ -244,21 +244,22 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
   let jpSetIndex, lastJpSet;
   const directJpCards = new Map();
   async function japaneseByNumber(query, signal) {
-    const text = query.trim().toLowerCase();
+    const text = query.trim().toLowerCase()
+      .replace(/\b(?:sr|sar|ur|ar|rrr?|hr)\b/g, '').trim()
+      .replace(/^(\d+\s*\/\s*\d+)\s+([a-z][a-z0-9-]*)$/, '$2 $1');
     if (!/^[a-z][a-z0-9-]*[\s#-]*\d+(?:\s*\/\s*\d+)?$/i.test(text)) return null;
     jpSetIndex ||= get(jpRoot + 'sets.json').then(data =>
       data.sets.filter(set => set.catalog === 'japanese' && set.code)
-        .sort((a,b) => b.code.length - a.code.length)
     ).catch(error => { jpSetIndex = null; throw error; });
     const sets = await jpSetIndex;
     if (signal.aborted) return null;
     const [prefix, total] = text.split('/').map(part => part.trim());
-    const first = sets.find(set => prefix.startsWith(set.code.toLowerCase()) &&
+    const candidates = sets.filter(set => prefix.startsWith(set.code.toLowerCase()) &&
       /^[\s#-]*\d+$/.test(prefix.slice(set.code.length)));
-    if (!first) return null;
-    const number = Number(prefix.slice(first.code.length).replace(/^[\s#-]+/,''));
+    if (!candidates.length) return null;
     const results = [];
-    for (const set of sets.filter(set => set.code.toLowerCase() === first.code.toLowerCase())) {
+    for (const set of candidates) {
+      const number = Number(prefix.slice(set.code.length).replace(/^[\s#-]+/,''));
       if (signal.aborted) return null;
       if (lastJpSet?.id !== set.id) {
         const [detail, market] = await Promise.all([
