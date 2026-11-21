@@ -9,7 +9,7 @@
 <details style="margin-top:12px" id="cardLookup" open>
 <summary>Pokémon-Karte suchen und Ankauf berechnen</summary>
 <label for="cardQuery">Kartenname, Setname oder Setkürzel</label>
-<input id="cardQuery" type="search" placeholder="z. B. ASC271 oder Glurak 4/102" autocomplete="off">
+<input id="cardQuery" type="search" placeholder="z. B. ASC271, svG052 oder Glurak 4/102" autocomplete="off">
 <p id="lookupStatus" role="status"></p>
 <div id="choicesBox" hidden><label for="choices">Passende Ausgaben</label><select id="choices"></select></div>
 <div id="quoteBox" hidden>
@@ -240,6 +240,47 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     if (!response.ok) throw Error('API ' + response.status);
     return response.json();
   }
+  const jpRoot = 'https://raw.githubusercontent.com/cardcorpus/pokemon-card-dataset/main/v1/';
+  let jpSetIndex, lastJpSet;
+  const directJpCards = new Map();
+  async function japaneseByNumber(query, signal) {
+    const text = query.trim().toLowerCase();
+    if (!/^[a-z][a-z0-9-]*[\s#-]*\d+(?:\s*\/\s*\d+)?$/i.test(text)) return null;
+    jpSetIndex ||= get(jpRoot + 'sets.json').then(data =>
+      data.sets.filter(set => set.catalog === 'japanese' && set.code)
+        .sort((a,b) => b.code.length - a.code.length)
+    ).catch(error => { jpSetIndex = null; throw error; });
+    const sets = await jpSetIndex;
+    if (signal.aborted) return null;
+    const [prefix, total] = text.split('/').map(part => part.trim());
+    const first = sets.find(set => prefix.startsWith(set.code.toLowerCase()) &&
+      /^[\s#-]*\d+$/.test(prefix.slice(set.code.length)));
+    if (!first) return null;
+    const number = Number(prefix.slice(first.code.length).replace(/^[\s#-]+/,''));
+    const results = [];
+    for (const set of sets.filter(set => set.code.toLowerCase() === first.code.toLowerCase())) {
+      if (signal.aborted) return null;
+      if (lastJpSet?.id !== set.id) {
+        const [detail, market] = await Promise.all([
+          get(jpRoot + 'sets/' + set.id + '.json', signal),
+          get(jpRoot + 'marketplaces/' + set.id + '.json', signal).catch(() => null)
+        ]);
+        if (signal.aborted) return null;
+        lastJpSet = {id:set.id, detail, market};
+      }
+      for (const row of lastJpSet.detail.cards) {
+        const printed = row.number?.printed || row.number?.numerator || '';
+        const [num, den] = printed.split('/');
+        if (Number(num) !== number || (total && Number(den || set.printedTotal) !== Number(total))) continue;
+        const id = set.id + '/' + row.id;
+        const name = set.code.toUpperCase() === 'SVG' && number === 51 ? 'Glumanda' : row.name;
+        const product = lastJpSet.market?.cards?.[row.id];
+        const print = {id:product?.variants?.[row.defaultCopy]?.cardmarket?.product || product?.cardmarket?.[0], set:set.name, number:printed};
+        results.push({id, name, localId:num, set:{name:set.name}, print});
+      }
+    }
+    return results;
+  }
   const svgCharmander = {
     id: 'jp-svg-051', name: 'Glumanda', localId: '051',
     set: {name: 'Bisaflor & Glurak & Turtok Special Deck Set ex', cardCount: {official: '049'}},
@@ -270,6 +311,21 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     timer = setTimeout(async () => {
       try {
         $('lookupStatus').textContent = 'Ausgaben werden gesucht …';
+        if ($('cardLanguage').value === 'ja') {
+          const cards = await japaneseByNumber(query, signal);
+          if (signal.aborted) return;
+          if (cards?.length) {
+            directJpCards.clear();
+            $('choices').replaceChildren(new Option('Ausgabe auswählen …',''));
+            for (const card of cards) {
+              directJpCards.set(card.id, card);
+              $('choices').add(new Option([card.name, card.print.set, card.print.number].join(' · '), card.id));
+            }
+            $('choicesBox').hidden = false;
+            $('lookupStatus').textContent = cards.length + (cards.length === 1 ? ' passende Ausgabe' : ' passende Ausgaben');
+            return;
+          }
+        }
         const index = await setIndex();
         if (signal.aborted) return;
         let matches = await findSetCards(query, index, signal).catch(() => null);
@@ -330,7 +386,7 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     try {
       $('lookupStatus').textContent = 'Kartendaten werden geladen …';
       const language = $('choices').selectedOptions[0].dataset.language;
-      const card = id === svgCharmander.id ? svgCharmander : await get('https://api.tcgdex.net/v2/' + language + '/cards/' + encodeURIComponent(id), signal);
+      const card = id === svgCharmander.id ? svgCharmander : directJpCards.get(id) || await get('https://api.tcgdex.net/v2/' + language + '/cards/' + encodeURIComponent(id), signal);
       if (card.print) $('cardLanguage').value = 'ja';
       if (signal.aborted) return;
       if (card.id !== id || !card.name || !card.localId) throw Error();
@@ -409,7 +465,7 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
       if (!series.length) series.add(new Option(japanese ? 'Japanischen Angebotspreis unten eintragen' : 'Kein öffentlicher Richtwert vorhanden',''));
       const updated = new Date(market?.updated);
       $('lookupStatus').textContent = market?.updated && Number.isFinite(updated.getTime()) ? 'Preisstand: ' + updated.toLocaleDateString('de-DE') : '';
-      $('cardCaption').textContent = [card.name, card.set?.name, numberOf(card)].filter(Boolean).join(' · ');
+      $('cardCaption').textContent = [card.name, card.set?.name, card.print?.number || numberOf(card)].filter(Boolean).join(' · ');
       $('basis').value = series.value;
       $('quoteBox').hidden = false;
       preview();
