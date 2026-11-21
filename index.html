@@ -4,10 +4,9 @@
 <nav><button onclick="tab('home')">Übersicht</button><button class="secondary" onclick="tab('fairs')">Messen</button><button class="secondary" onclick="tab('stock')">Bestand</button><button class="secondary" onclick="tab('new')">+ Ankauf</button><button class="secondary" onclick="tab('calc')">Rechner</button><button class="secondary" onclick="tab('export')">Export</button><button class="secondary" onclick="tab('cloud')">Cloud</button></nav>
 <div id="fairs" class="page hidden"><section id="fairView"></section></div>
 <div id="home" class="page"><div class="stats"><section><small>Karten auf Lager</small><div id="count" class="value">0</div></section><section><small>Einkaufswert (zugeordnet)</small><div id="stockValue" class="value">0 €</div></section><section><small>Verkaufte Karten</small><div id="soldCount" class="value">0</div></section><section><small>Verkaufserlöse</small><div id="salesValue" class="value">0 €</div></section></div><section><h2>Schnellzugriff</h2><div class="actions"><button onclick="tab('fairs')">Messeordner öffnen</button><button onclick="tab('new')">+ Karte / Sammlung erfassen</button><button class="secondary" onclick="tab('stock')">Bestand ansehen</button></div></section><section class="notice">Alle Daten werden lokal auf diesem Gerät gespeichert. Bitte nach jeder Erfassungssitzung ein JSON-Backup exportieren und in „Dateien“/iCloud Drive sichern. Browserdaten können gelöscht werden.</section></div>
-<div id="new" class="page hidden"><section><div id="fairCapture" hidden></div><h2 id="buyHeading">Ankauf erfassen</h2><label id="kindLabel">Art des Ankaufs</label><select id="kind" onchange="kindChanged()"><option value="single">Einzelkarte</option><option value="collection">Sammlung</option></select><div class="grid"><div><label>Einkaufsdatum</label><input type="date" id="purchaseDate"></div><div><label>Verkäuferart</label><select id="sellerType"><option value="privat">Privatperson</option><option value="unternehmen">Unternehmen</option><option value="einlage">Privateinlage</option></select></div><div class="full"><label id="nameLabel">Kartenname</label><input id="name" placeholder="z. B. Glurak 4/102"></div><div id="cardFields" class="full grid">
-<div class="full">
+<div id="new" class="page hidden"><section><div id="fairCapture" hidden></div><h2 id="buyHeading">Ankauf erfassen</h2><label id="kindLabel">Art des Ankaufs</label><select id="kind" onchange="kindChanged()"><option value="single">Einzelkarte</option><option value="collection">Sammlung</option></select><div class="grid"><div><label>Einkaufsdatum</label><input type="date" id="purchaseDate"></div><div><label>Verkäuferart</label><select id="sellerType"><option value="privat">Privatperson</option><option value="unternehmen">Unternehmen</option><option value="einlage">Privateinlage</option></select></div><div class="full" id="lookupFields">
 <label for="cardLanguage">Kartensprache</label><select id="cardLanguage"><option value="de">Deutsch</option><option value="en">Englisch</option><option value="ja">Japanisch</option></select>
-<details style="margin-top:12px" id="cardLookup">
+<details style="margin-top:12px" id="cardLookup" open>
 <summary>Pokémon-Karte suchen und Ankauf berechnen</summary>
 <label for="cardQuery">Kartenname, Setname oder Setkürzel</label>
 <input id="cardQuery" type="search" placeholder="z. B. ASC271 oder Glurak 4/102" autocomplete="off">
@@ -24,8 +23,10 @@
 <div class="grid"><div><label for="basis">Marktwert für den Ankauf (€)</label><input id="basis" inputmode="decimal"></div>
 <div><label for="buyRate">Ankaufsquote (%)</label><input id="buyRate" inputmode="decimal" value="75"></div></div>
 <p id="quotePreview" aria-live="polite"></p>
-<button type="button" id="takeQuote">Karte und Preise übernehmen</button>
+<button type="button" id="takeQuote">Preise übernehmen</button>
 </div></details></div>
+<div class="full"><label id="nameLabel" for="name">Kartenname</label><input id="name" placeholder="z. B. Glurak 4/102"></div><div id="cardFields" class="full grid">
+
 <div><label>Set</label><input id="setName" placeholder="Base Set"></div><div><label>Kartennummer</label><input id="cardNumber" placeholder="4/102"></div><div id="conditionSlot"><label for="condition">Zustand</label><select id="condition"><option>NM</option><option>EX</option><option>GD</option><option>LP</option><option>PL</option><option>PO</option><option>Graded</option><option>Versiegelt</option><option>Sonstiges</option></select></div><div><label>Marktwert (€), optional</label><input id="market" inputmode="decimal" placeholder="110,00"></div></div><div><label id="priceLabel">Einkaufspreis (€)</label><input id="purchasePrice" inputmode="decimal" placeholder="70,00"></div><div><label>Steuerliche Einordnung</label><select id="taxType"><option value="pruefen">Noch prüfen</option><option value="diff">§25a möglich (prüfen)</option><option value="regular">Regelbesteuert</option><option value="einlage">Privateinlage</option></select></div><div class="full"><label>Belegnummer / Notiz</label><textarea id="note" placeholder="Beleg, Verkäufer, Herkunft, Bemerkungen"></textarea></div></div><button id="savePurchase" onclick="if(window.fairUI?.capturing()) fairUI.stageCard(); else addPurchase()">Ankauf speichern</button><p id="purchaseMessage"></p><div id="captureSticky" class="fairSummary" hidden></div></section></div>
 <div id="stock" class="page hidden"><section><h2>Warenbestand</h2><input id="search" placeholder="Karte, Set, Nummer oder ID suchen" oninput="renderStock()"><label>Statusfilter</label><select id="filter" onchange="renderStock()"><option value="all">Alle</option><option value="stock">Auf Lager</option><option value="listed">Eingestellt</option><option value="sold">Verkauft</option></select><div id="items"></div></section></div>
 <div id="cloud" class="page hidden"><section><h2>☁️ Cloud-Synchronisierung</h2><p id="cloudStatus">Nicht angemeldet</p><label>E-Mail</label><input id="cloudEmail" type="email" autocomplete="username" placeholder="Deine Supabase-E-Mail"><label>Passwort</label><input id="cloudPassword" type="password" autocomplete="current-password" placeholder="Passwort des Supabase-App-Benutzers"><div class="actions"><button onclick="cloudLogin()">Anmelden</button><button class="secondary" onclick="cloudLogout()">Abmelden</button><button class="secondary" onclick="cloudPull()">Cloud neu laden</button></div><hr><p>Beim ersten Anmelden werden vorhandene lokale Daten <strong>nicht automatisch überschrieben</strong>. Wähle erst nach dem JSON-Backup eine Übernahmeoption.</p><div class="actions"><button onclick="cloudUploadInitial()">Lokale Daten erstmalig hochladen</button><button class="secondary" onclick="cloudPull()">Cloud-Daten übernehmen</button></div><p class="warn" id="cloudWarning">Wichtig: Vor dem ersten Hochladen ein JSON-Backup sichern. Auf mehreren Geräten nicht gleichzeitig bearbeiten.</p></section></div><div id="calc" class="page hidden"><section><h2>Dein bisheriger Gewinnrechner</h2><p>Der vorhandene Rechner bleibt unverändert erhalten.</p><iframe title="eBay Gewinnrechner" src="./rechner.html"></iframe></section></div>
@@ -35,10 +36,10 @@
 const KEY='psychedelicards_inventory_v1';const $=id=>document.getElementById(id);const money=v=>Number(v||0).toLocaleString('de-DE',{style:'currency',currency:'EUR'});const val=v=>Number(String(v||'0').replace(',','.'));const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const today=()=>new Date().toLocaleDateString('en-CA');let db;try{db=JSON.parse(localStorage.getItem(KEY))||{collections:[],cards:[]}}catch{db={collections:[],cards:[]}};db.collections??=[];db.cards??=[];let editId=null;
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(db));renderAll();queueCloudSave();return true}catch(e){alert('Speichern fehlgeschlagen. Bitte Speicherplatz prüfen und Backup sichern.');return false}}
 function tab(id){window.fairUI?.onTab(id);document.querySelectorAll('.page').forEach(p=>p.classList.toggle('hidden',p.id!==id));document.querySelectorAll('nav button').forEach((b,i)=>b.classList.toggle('secondary',['home','fairs','stock','new','calc','export','cloud'][i]!==id));renderAll()}
-function kindChanged(){const collection=$('kind').value==='collection';$('cardFields').classList.toggle('hidden',collection);$('nameLabel').textContent=collection?'Name der Sammlung':'Kartenname';$('priceLabel').textContent=collection?'Gesamter Einkaufspreis (€)':'Einkaufspreis (€)'}
+function kindChanged(){const collection=$('kind').value==='collection';$('cardFields').classList.toggle('hidden',collection);$('lookupFields').hidden=collection;$('nameLabel').textContent=collection?'Name der Sammlung':'Kartenname';$('priceLabel').textContent=collection?'Gesamter Einkaufspreis (€)':'Einkaufspreis (€)'}
 function uid(prefix){return prefix+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7)}
 const languages = {de:'Deutsch',en:'Englisch',ja:'Japanisch'};
-function addPurchase(){const name=$('name').value.trim(),price=val($('purchasePrice').value);if(!name||!Number.isFinite(price)||price<0||!$('purchasePrice').value.trim()){alert('Bitte Namen und gültigen Einkaufspreis eintragen.');return}const base={id:uid('A'),name,purchaseDate:$('purchaseDate').value||today(),sellerType:$('sellerType').value,taxType:$('taxType').value,note:$('note').value,purchasePrice:price,createdAt:new Date().toISOString()};if($('kind').value==='collection'){db.collections.push({...base});$('purchaseMessage').textContent='Sammlung gespeichert. Öffne „Bestand“, um einzelne Karten hinzuzufügen.'}else{db.cards.push({...base,searchCode:$('name').dataset.lookupCode||'',collectionId:null,allocatedCost:price,setName:$('setName').value,cardNumber:$('cardNumber').value,language:$('cardLanguage').value,condition:$('condition').value,market:val($('market').value),status:'stock',sale:null});$('purchaseMessage').textContent='Karte gespeichert.'}if(persist()){$('name').dataset.lookupCode='';$('name').value='';$('purchasePrice').value='';$('note').value='';$('setName').value='';$('cardNumber').value='';$('market').value=''}}
+function addPurchase(){const name=$('name').value.trim(),price=val($('purchasePrice').value);if(!name||!Number.isFinite(price)||price<0||!$('purchasePrice').value.trim()){alert('Bitte Namen und gültigen Einkaufspreis eintragen.');return}const base={id:uid('A'),name,purchaseDate:$('purchaseDate').value||today(),sellerType:$('sellerType').value,taxType:$('taxType').value,note:$('note').value,purchasePrice:price,createdAt:new Date().toISOString()};if($('kind').value==='collection'){db.collections.push({...base});$('purchaseMessage').textContent='Sammlung gespeichert. Öffne „Bestand“, um einzelne Karten hinzuzufügen.'}else{db.cards.push({...base,searchCode:$('name').dataset.lookupCode||'',collectionId:null,allocatedCost:price,setName:$('setName').value,cardNumber:$('cardNumber').value,language:$('cardLanguage').value,condition:$('condition').value,market:val($('market').value),status:'stock',sale:null});$('purchaseMessage').textContent='Karte gespeichert.'}if(persist()){$('name').dataset.lookupCode='';$('name').value='';$('purchasePrice').value='';$('note').value='';$('setName').value='';$('cardNumber').value='';$('market').value='';$('cardQuery').value='';$('cardQuery').dispatchEvent(new Event('input'));if($('kind').value==='single'){$('cardLookup').open=true;$('cardQuery').focus()}}}
 function renderAll(){const unsold=db.cards.filter(c=>c.status!=='sold');$('count').textContent=unsold.length;$('stockValue').textContent=money(unsold.reduce((a,c)=>a+Number(c.allocatedCost||0),0));$('soldCount').textContent=db.cards.filter(c=>c.status==='sold').length;$('salesValue').textContent=money(db.cards.reduce((a,c)=>a+Number(c.sale?.price||0)+Number(c.sale?.buyerShipping||0),0));renderStock();window.fairUI?.refresh()}
 function renderStock(){const q=$('search').value.toLowerCase(),f=$('filter').value;let html='';for(const co of db.collections.filter(c=>(c.name+' '+c.id).toLowerCase().includes(q)||!q)){const linked=db.cards.filter(c=>c.collectionId===co.id),allocated=linked.reduce((a,c)=>a+Number(c.allocatedCost||0),0),remaining=co.purchasePrice-allocated;html+=`<div class="item"><div class="row"><strong>📦 ${esc(co.name)}</strong><span class="tag">Sammlung</span></div><small>${esc(co.id)} · ${esc(co.purchaseDate)}</small><p>Gesamteinkauf: ${money(co.purchasePrice)} · Zugeteilt: ${money(allocated)} · Offen: ${money(remaining)} · ${linked.length} Karten</p><div class="actions"><button onclick="addToCollection('${co.id}')">+ Karte hinzufügen</button></div></div>`}
 if(window.fairUI&&!q&&f==='all')html+=fairUI.stockFolders();for(const c of db.cards.filter(c=>(!c.fairId||q||f!=='all')&&(window.fairUI?fairUI.matches(c,q):(c.name+' '+c.setName+' '+c.cardNumber+' '+c.id).toLowerCase().includes(q))&&(f==='all'||c.status===f))){html+=`<div class="item"><div class="row"><strong>${esc(c.name)}</strong><span class="tag">${({stock:'Auf Lager',listed:'Eingestellt',sold:'Verkauft'})[c.status]||esc(c.status)}</span></div><small>${esc(c.setName||'')} ${esc(c.cardNumber||'')} · ${languages[c.language]||'Sprache offen'} · ${esc(c.id)}</small>${window.fairUI?fairUI.origin(c):''}<p>Einkauf: ${money(c.allocatedCost)}${c.sale?' · Verkauf: '+money(c.sale.price):''}</p><div class="actions"><button class="secondary" onclick="editCard('${c.id}')">Bearbeiten</button>${c.status!=='sold'?`<button onclick="sellCard('${c.id}')">Verkauf erfassen</button>`:''}</div></div>`} $('items').innerHTML=html||'<p>Noch keine Einträge.</p>'}
@@ -294,6 +295,8 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
       if (signal.aborted) return;
       if (card.id !== id || !card.name || !card.localId) throw Error();
       selected = card;
+      $('name').value = card.name;
+      $('name').dataset.lookupCode = $('cardQuery').value.trim();
       await renderLanguage();
     } catch {
       if (!signal.aborted) $('lookupStatus').textContent = 'Kartendaten nicht erreichbar. Ausgabe erneut auswählen oder manuell erfassen.';
@@ -320,8 +323,13 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
   function japanesePrint() {
     return jpOptions.find(print => String(print.id) === $('jpPrint').value);
   }
+  function fillEdition(set, number) {
+    $('setName').value = set || '';
+    $('cardNumber').value = number || '';
+  }
   function applyJapanesePrint() {
     const print = japanesePrint();
+    fillEdition(print?.set, print?.number);
     showOffer(print?.id);
     $('basis').value = '';
     $('cmNotice').textContent = print ? print.set + ' · ' + print.number : 'Bitte die japanische Ausgabe auswählen.';
@@ -333,6 +341,7 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     const card = selected, current = ++version;
     if (!card) return;
     const japanese = $('cardLanguage').value === 'ja';
+    fillEdition(japanese ? '' : card.set?.name, japanese ? '' : numberOf(card));
     const product = card.pricing?.cardmarket?.idProduct;
     jpOptions = [];
     $('jpPrintBox').hidden = true;
@@ -382,21 +391,14 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
   function closeLookup() {
     reset();
     $('cardQuery').value = '';
-    $('cardLookup').open = false;
+    $('cardLookup').open = $('kind').value === 'single';
   }
   $('kind').addEventListener('change', closeLookup);
   $('takeQuote').addEventListener('click', () => {
     const price = amount();
     if (!selected || !Number.isFinite(price) || $('kind').value !== 'single') return;
-    $('name').value = selected.name;
-    const print = $('cardLanguage').value === 'ja' ? japanesePrint() : null;
-    if ($('cardLanguage').value === 'ja' && !print) return;
-    $('setName').value = print?.set || selected.set?.name || '';
-    $('cardNumber').value = print?.number || numberOf(selected);
     $('market').value = decimal($('basis').value).toFixed(2);
     $('purchasePrice').value = price.toFixed(2);
-    $('name').dataset.lookupCode = $('cardQuery').value.trim();
-    closeLookup();
     if(window.fairUI?.capturing()) fairUI.stageCard();
     else $('condition').focus();
   });
@@ -570,7 +572,7 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     $('kind').hidden=capture;$('kindLabel').hidden=capture;
     $('buyHeading').textContent=capture?'Karte zum Messeankauf hinzufügen':'Ankauf erfassen';
     $('savePurchase').textContent=capture?'Zur Ankaufliste hinzufügen':'Ankauf speichern';
-    $('takeQuote').textContent=capture?'Zur Ankaufliste hinzufügen':'Karte und Preise übernehmen';
+    $('takeQuote').textContent=capture?'Zur Ankaufliste hinzufügen':'Preise übernehmen';
     syncCondition();
     $('captureSticky').hidden=!capture;
     if(capture && d)$('captureSticky').innerHTML=summary(d)+button('resume','Liste prüfen');
