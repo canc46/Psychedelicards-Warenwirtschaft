@@ -293,6 +293,11 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     const name = key.replace(/(?:svg)?0?51(?:\/0?49)?$/,'');
     return name.length >= 2 && ['glumanda','charmander','ヒトカゲ','hitokage'].some(alias=>alias.startsWith(name));
   }
+  const birthdayPikachu = {id:'cel25c-24_A', name:"_____'s Pikachu", localId:'WP 24', set:{name:'Celebrations'}, offerPath:'Celebrations/s-Pikachu'};
+  function addBirthday() {
+    $('choices').add(new Option(birthdayPikachu.name+' · Celebrations · CEL WP 24 (Birthday Pikachu)',birthdayPikachu.id));
+    $('choicesBox').hidden=false;
+  }
   function addJapaneseResult() {
     $('choices').add(new Option('Glumanda · Japanisch · svG 051/049', svgCharmander.id));
     $('choicesBox').hidden = false;
@@ -301,6 +306,15 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     reset();
     const query = $('cardQuery').value.trim();
     if (query.length < 2) return;
+    const key=normalize(query);
+    const exactBirthday=/^(?:(?:cel|celebrations)?wp0?24|(?:birthday|geburtstags?)pikachu|pikachu(?:birthday|geburtstag)|spikachucelwp24)$/.test(key);
+    const birthday=exactBirthday || /^(?:cel|celebrations|pikachu|spikachu|pikachu24|cel24|celebrations24|celebrations(?:s)?pikachu|pikachucelebrations)$/.test(key);
+    if (birthday) {
+      $('choices').replaceChildren(new Option('Ausgabe auswählen …',''));
+      addBirthday();
+      $('lookupStatus').textContent='1 passende Ausgabe';
+      if (exactBirthday) return;
+    }
     const direct = matchesSvgCharmander(query);
     if (direct) {
       $('choices').replaceChildren(new Option('Ausgabe auswählen …',''));
@@ -364,13 +378,14 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
         }
         if (signal.aborted) return;
         $('choices').replaceChildren(new Option('Ausgabe auswählen …',''));
+        if (birthday) addBirthday();
         if (direct) addJapaneseResult();
         for (const row of matches) {
           const option = new Option(row.name + ' · ' + (index.get(setId(row))?.name || setId(row)) + ' · Nr. ' + row.localId, row.id);
           option.dataset.language = row.language || 'de';
           $('choices').add(option);
         }
-        const count = matches.length + Number(direct);
+        const count = matches.length + Number(direct) + Number(birthday);
         $('choicesBox').hidden = !count;
         $('lookupStatus').textContent = count ? count + ' passende Ausgaben' : 'Keine passende Ausgabe gefunden.';
       } catch {
@@ -387,7 +402,7 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     try {
       $('lookupStatus').textContent = 'Kartendaten werden geladen …';
       const language = $('choices').selectedOptions[0].dataset.language;
-      const card = id === svgCharmander.id ? svgCharmander : directJpCards.get(id) || await get('https://api.tcgdex.net/v2/' + language + '/cards/' + encodeURIComponent(id), signal);
+      const card = id === birthdayPikachu.id ? birthdayPikachu : id === svgCharmander.id ? svgCharmander : directJpCards.get(id) || await get('https://api.tcgdex.net/v2/' + language + '/cards/' + encodeURIComponent(id), signal);
       if (card.print) $('cardLanguage').value = 'ja';
       if (signal.aborted) return;
       if (card.id !== id || !card.name || !card.localId) throw Error();
@@ -400,19 +415,19 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     }
   });
   let jpCatalog, jpOptions = [], version = 0;
-  function showOffer(id) {
+  function showOffer(id, path) {
     const lang = $('cardLanguage').value;
     const link = $('cmOfferLink');
-    link.hidden = !id;
-    if (!id) { link.removeAttribute('href'); return; }
+    link.hidden = !id && !path;
+    if (!id && !path) { link.removeAttribute('href'); return; }
     const paths = {
       745014:'Venusaur-Charizard-Blastoise-Special-Deck-Set-ex/Charmander-V2-svG051',
       869882:'Ascended-Heroes/Mega-Dragonite-ex-V2-ASC271',
       861475:'MEGA-Dream-ex/Mega-Dragonite-ex-V2-m2a232',
       273699:'Base-Set/Charizard'
     };
-    const url = new URL('https://www.cardmarket.com/de/Pokemon/Products' + (paths[id] ? '/Singles/' + paths[id] : ''));
-    if (!paths[id]) url.searchParams.set('idProduct', id);
+    const url = new URL('https://www.cardmarket.com/de/Pokemon/Products' + ((path || paths[id]) ? '/Singles/' + (path || paths[id]) : ''));
+    if (!path && !paths[id]) url.searchParams.set('idProduct', id);
     url.searchParams.set('language', {de:3,en:1,ja:7}[lang]);
     url.searchParams.set('sellerCountry','7');
     link.href = url.href;
@@ -452,8 +467,8 @@ window.addEventListener('focus',()=>{if(cloudReady)cloudCheck()});
     jpOptions = [];
     $('jpPrintBox').hidden = true;
     $('jpCredit').hidden = !japanese;
-    showOffer(japanese ? null : product);
-    $('cmNotice').textContent = japanese ? 'Japanische Ausgabe wird gesucht …' : (product ? '' : 'Für diese Ausgabe fehlt ein Cardmarket-Link.');
+    showOffer(japanese ? null : product, japanese ? null : card.offerPath);
+    $('cmNotice').textContent = japanese ? 'Japanische Ausgabe wird gesucht …' : (product || card.offerPath ? '' : 'Für diese Ausgabe fehlt ein Cardmarket-Link.');
       const market = japanese ? null : card.pricing?.cardmarket;
       const series = $('priceSeries');
       series.replaceChildren();
